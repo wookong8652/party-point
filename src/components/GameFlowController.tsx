@@ -22,12 +22,20 @@ export default function GameFlowController({code,api,onMessage,onError}:{code:st
  async function begin(){
   setBusy(true);onError("");
   try{
+   const persisted=JSON.parse(localStorage.getItem(storageKey)||"null");
+   const currentIndex=Number.isInteger(persisted?.index)?Math.max(0,Math.min(persisted.index,STEPS.length-1)):index;
+   const activeStep=STEPS[currentIndex];
    const quizCurrent=await api("host_get_active_round");
-   if(quizCurrent.round && ["answering","closed"].includes(quizCurrent.round.status)){
+   // 답변 접수 중인 퀴즈만 이어서 연다.
+   // 이미 마감된 퀴즈(closed)는 완료된 라운드이므로 다음 순서로 진행해야 한다.
+   if(quizCurrent.round && quizCurrent.round.status==="answering"){
     const quizStep=STEPS.findIndex(x=>x.kind==="quiz" && x.round===Number(quizCurrent.round.round_number));
-    if(quizStep>=0){setIndex(quizStep);localStorage.setItem(storageKey,JSON.stringify({index:quizStep,started:true,done:false}));}
-    router.push(`/host/${code}/play/game?kind=quiz&round=${quizCurrent.round.round_number}&step=${Math.max(quizStep,0)}`);
-    return;
+    if(quizStep>=0){
+     setIndex(quizStep);
+     localStorage.setItem(storageKey,JSON.stringify({index:quizStep,started:true,done:false}));
+     router.push(`/host/${code}/play/game?kind=quiz&round=${quizCurrent.round.round_number}&step=${quizStep}`);
+     return;
+    }
    }
    const current=await api("host_get_current_game");
    if(current.session && ["active","closed"].includes(current.session.status)){
@@ -38,19 +46,25 @@ export default function GameFlowController({code,api,onMessage,onError}:{code:st
     router.push(`/host/${code}/play/game?kind=${targetKind}&key=${existing.game_key}&round=${existing.round_number||1}&step=${Math.max(match,0)}`);
     return;
    }
-   if(step.kind==="quiz"){
+   if(activeStep.kind==="quiz"){
+    setIndex(currentIndex);
+    localStorage.setItem(storageKey,JSON.stringify({index:currentIndex,started:true,done:false}));
     setStarted(true);
-    router.push(`/host/${code}/play/game?kind=quiz&round=${step.round}&step=${index}`);
+    router.push(`/host/${code}/play/game?kind=quiz&round=${activeStep.round}&step=${currentIndex}`);
     return;
    }
-   if(step.kind==="ox"){
+   if(activeStep.kind==="ox"){
+    setIndex(currentIndex);
+    localStorage.setItem(storageKey,JSON.stringify({index:currentIndex,started:true,done:false}));
     setStarted(true);
-    router.push(`/host/${code}/play/game?kind=ox&round=${step.round}&step=${index}`);
+    router.push(`/host/${code}/play/game?kind=ox&round=${activeStep.round}&step=${currentIndex}`);
     return;
    }
-   await api("host_create_game",{gameKey:step.key,question:"",answer:"O",roundNumber:step.round});
+   await api("host_create_game",{gameKey:activeStep.key,question:"",answer:"O",roundNumber:activeStep.round});
+   setIndex(currentIndex);
+   localStorage.setItem(storageKey,JSON.stringify({index:currentIndex,started:true,done:false}));
    setStarted(true);
-   router.push(`/host/${code}/play/game?kind=game&key=${step.key}&round=${step.round}&step=${index}`);
+   router.push(`/host/${code}/play/game?kind=game&key=${activeStep.key}&round=${activeStep.round}&step=${currentIndex}`);
   }catch(e){onError(e instanceof Error?e.message:"게임 시작에 실패했어.");}
   finally{setBusy(false)}
  }
