@@ -18,7 +18,8 @@ export default function PlayerRoom(){
  const previousSessionId=useRef<string|null>(null);
  const nickname=typeof window!=="undefined"?localStorage.getItem(`party-nickname-${code}`):null;
  const me=players.find(p=>p.nickname===nickname);
- const sorted=useMemo(()=>[...players].sort((a,b)=>b.points-a.points),[players]);
+ const participants=useMemo(()=>players.filter(p=>!p.is_host),[players]);
+ const sorted=useMemo(()=>[...participants].sort((a,b)=>b.points-a.points),[participants]);
  useEffect(()=>{
   const nextId=gameSession?.id??null;
   if(previousSessionId.current!==nextId){
@@ -102,7 +103,7 @@ export default function PlayerRoom(){
    <section className="card"><div className="muted">내 닉네임</div><h2 style={{marginTop:8}}>{me.nickname}</h2><div className="muted">보유 포인트</div><div className="points">{me.points.toLocaleString()} P</div></section>
    <section className="card stack"><div><h2>내 비밀 미션</h2><p className="muted">난이도를 선택하면 해당 난이도에서 랜덤 미션이 배정돼.</p></div>{!me.mission_id?<><div className="grid3">{(["easy","normal","hard"] as MissionLevel[]).map(l=><button key={l} className={`level ${level===l?"selected":""}`} onClick={()=>setLevel(l)}><strong>{LEVEL_LABEL[l]}</strong><span>{l==="easy"?"300P":l==="normal"?"500P":"1,000P"}</span></button>)}</div><button className="btn full" disabled={busy||room?.status==="finished"} onClick={()=>action("assign_mission",{level})}>랜덤 미션 받기</button></>:<><div className="notice"><b>{me.mission_title||me.mission_id}</b><br/>{me.mission_description}</div><div className="row"><span className="pill">{levelName}</span><b>보상 {me.mission_reward?.toLocaleString()}P</b></div><div className="muted">상태: {({active:"수행 중",submitted:"진행자 확인 대기",approved:"성공 승인",rejected:"반려"})[me.mission_status]||"미배정"}</div>{me.mission_status==="active"&&<button className="btn full" disabled={busy} onClick={()=>action("submit_mission")}>미션 성공 확인 요청</button>}{me.mission_status==="rejected"&&<div className="error">미션이 반려됐어. 진행자에게 확인해줘.</div>}</>}</section>
   </div>}
-  <section className="card" style={{marginTop:14}}><div className="row"><h2>실시간 순위</h2><span className="muted">{players.length}/10명</span></div><div className="list">{sorted.map((p,i)=><div className="listitem" key={p.id}><div className="player"><div className="avatar">{i+1}</div><div><b>{p.nickname}</b>{p.is_host&&<span className="muted"> · 진행자</span>}</div></div><b>{p.points.toLocaleString()}P</b></div>)}</div></section>
+  <section className="card" style={{marginTop:14}}><div className="row"><h2>실시간 순위</h2><span className="muted">{participants.length}/10명</span></div><div className="list">{sorted.map((p,i)=><div className="listitem" key={p.id}><div className="player"><div className="avatar">{i+1}</div><div><b>{p.nickname}</b></div></div><b>{p.points.toLocaleString()}P</b></div>)}</div></section>
   <p className="muted" style={{textAlign:"center"}}>초대 코드: <b>{code}</b></p>
  </main>;
 }

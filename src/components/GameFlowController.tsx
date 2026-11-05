@@ -57,7 +57,41 @@ export default function GameFlowController({code,api,onMessage,onError}:{code:st
  return <section className="card stack flow-controller">
   <div className="row"><div><h2>🎬 전체 게임 진행</h2><p className="muted">게임을 선택하면 전용 무대로 이동해.</p></div><span className="pill">{done?"완료":`${index+1}/${STEPS.length}`}</span></div>
   <div className="flow-progress"><div style={{width:`${done?100:index/STEPS.length*100}%`}}/></div>
-  {!done?<><div className="flow-current"><span className="muted">다음 게임</span><strong>{step.title}</strong><p>시작 버튼을 누르면 전체 화면 게임 무대로 전환돼.</p></div><div className="flow-list">{STEPS.map((s,i)=><div className={`flow-step ${i===index?"current":i<index?"passed":""}`} key={`${s.key}-${s.round}`}><span>{i<index?"✓":i+1}</span><b>{s.title}</b></div>)}</div><button className="btn full" disabled={busy} onClick={begin}>{busy?"게임 준비 중...":`${step.title} 시작하기 →`}</button></>:<div className="success">모든 게임을 완료했어.</div>{standings.length>0&&<div className="card stack"><h2>🏆 최종 우승자</h2><h1>{standings[0].nickname}</h1><strong>{Number(standings[0].points).toLocaleString()}P</strong>{standings.map((p,i)=><div className="listitem" key={p.id}><span>{i+1}위 · {p.nickname}</span><b>{Number(p.points).toLocaleString()}P</b></div>)}</div>}}
+  {!done ? (
+    <>
+      <div className="flow-current">
+        <span className="muted">다음 게임</span>
+        <strong>{step.title}</strong>
+        <p>시작 버튼을 누르면 전체 화면 게임 무대로 전환돼.</p>
+      </div>
+      <div className="flow-list">
+        {STEPS.map((s,i)=>(
+          <div className={`flow-step ${i===index?"current":i<index?"passed":""}`} key={`${s.key}-${s.round}`}>
+            <span>{i<index?"✓":i+1}</span><b>{s.title}</b>
+          </div>
+        ))}
+      </div>
+      <button className="btn full" disabled={busy} onClick={begin}>
+        {busy?"게임 준비 중...":`${step.title} 시작하기 →`}
+      </button>
+    </>
+  ) : (
+    <>
+      <div className="success">모든 게임을 완료했어.</div>
+      {standings.length>0&&(
+        <div className="card stack">
+          <h2>🏆 최종 우승자</h2>
+          <h1>{standings[0].nickname}</h1>
+          <strong>{Number(standings[0].points).toLocaleString()}P</strong>
+          {standings.map((p,i)=>(
+            <div className="listitem" key={p.id}>
+              <span>{i+1}위 · {p.nickname}</span><b>{Number(p.points).toLocaleString()}P</b>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )}
   <div className="row"><button className="btn secondary" disabled={index===0||busy} onClick={()=>setIndex(v=>v-1)}>이전 순서</button><button className="btn secondary" disabled={busy} onClick={async()=>{if(index===STEPS.length-1){setBusy(true);try{const result=await api("host_finish");setStandings(result.standings||[]);setDone(true);}catch(e){onError(e instanceof Error?e.message:"파티 종료 실패");}finally{setBusy(false)}}else setIndex(v=>v+1)}}>{index===STEPS.length-1?"파티 종료 및 최종 우승자 발표":"다음 순서로 건너뛰기"}</button></div>
  </section>;
 }
