@@ -180,13 +180,27 @@ export async function POST(req: NextRequest) {
         throw new Error("최대 참가 인원 10명이 모두 찼어.");
       }
 
+      const nickname = String(body.nickname || "").trim().replace(/\\s+/g, " ");
+      if (!nickname || nickname.length > 12) {
+        throw new Error("닉네임은 1~12자로 입력해줘.");
+      }
+      const { data: duplicate } = await db
+        .from("players")
+        .select("id")
+        .eq("room_id", room.id)
+        .eq("nickname", nickname)
+        .maybeSingle();
+      if (duplicate) {
+        throw new Error("이미 사용 중인 닉네임이야. 다른 닉네임을 입력해줘.");
+      }
+
       const playerToken = createToken();
 
       const { data: player, error: playerError } = await db
         .from("players")
         .insert({
           room_id: room.id,
-          nickname: String(body.nickname).slice(0, 12),
+          nickname,
           points: 5000,
           token_hash: hash(playerToken),
         })
@@ -428,7 +442,7 @@ export async function POST(req: NextRequest) {
       const { data: active } = await db.from("game_rounds")
         .select("id").eq("room_id", room.id).eq("status", "answering").maybeSingle();
       if (active) throw new Error("현재 진행 중인 퀴즈 라운드가 있어.");
-      const endsAt = new Date(Date.now() + 10000).toISOString();
+      const endsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await db.from("game_rounds").insert({
         room_id: room.id, game_key: "subjective_quiz", round_number: roundNumber,
         question, status: "answering", started_at: new Date().toISOString(), ends_at: endsAt
@@ -444,7 +458,7 @@ export async function POST(req: NextRequest) {
       const { data: round, error: roundError } = await db.from("game_rounds")
         .select("*").eq("id", body.roundId).eq("room_id", room.id).single();
       if (roundError || !round) throw new Error("퀴즈 라운드를 찾을 수 없어.");
-      if (round.status !== "answering" || Date.now() > new Date(round.ends_at).getTime()) {
+      if (round.status !== "answering") {
         throw new Error("답변 시간이 끝났어.");
       }
       const { data: existing } = await db.from("quiz_answers").select("id")
