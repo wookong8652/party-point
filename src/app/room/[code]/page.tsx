@@ -6,7 +6,7 @@ import {LEVEL_LABEL,type MissionLevel} from "@/lib/missions";
 import GameStage from "@/components/GameStage";
 
 type P={id:string;room_id:string;nickname:string;points:number;mission_level:MissionLevel|null;mission_id:string|null;mission_status:string;is_host:boolean;created_at:string;mission_title?:string;mission_description?:string;mission_reward?:number};
-type Round={id:string;round_number:number;question:string;status:string;started_at:string;ends_at:string};
+type Round={id:string;round_number:number;question:string;status:string;started_at:string;ends_at:string;created_at?:string};
 
 export default function PlayerRoom(){
  const {code:raw}=useParams<{code:string}>();const code=raw.toUpperCase();
@@ -20,6 +20,13 @@ export default function PlayerRoom(){
  const me=players.find(p=>p.nickname===nickname);
  const participants=useMemo(()=>players.filter(p=>!p.is_host),[players]);
  const sorted=useMemo(()=>[...participants].sort((a,b)=>b.points-a.points),[participants]);
+ const visibleQuizRound=useMemo(()=>{
+  if(!round)return null;
+  if(!gameSession)return round;
+  const quizTime=new Date(round.started_at||round.created_at||0).getTime();
+  const gameTime=new Date(gameSession.started_at||gameSession.created_at||0).getTime();
+  return quizTime>gameTime?round:null;
+ },[round,gameSession]);
  useEffect(()=>{
   const nextId=gameSession?.id??null;
   if(previousSessionId.current!==nextId){
@@ -39,14 +46,19 @@ export default function PlayerRoom(){
   const {data:p}=await supabase.from("players").select("id,room_id,nickname,points,mission_level,mission_id,mission_status,is_host,created_at,mission_title,mission_description,mission_reward").eq("room_id",r.id).order("created_at");
   setPlayers((p||[]) as P[]);
  },[code]);
- const loadGame=useCallback(async()=>{try{const token=sessionStorage.getItem(`party-player-${code}`);const res=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json","x-player-token":token||""},body:JSON.stringify({action:"player_get_current_game",code})});const d=await res.json();if(res.ok){setGameSession(d.session);if(d.session?.status!=="active")setGameEntered(false);}const cr=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json","x-player-token":token||""},body:JSON.stringify({action:"player_get_game_coupons",code})});const cd=await cr.json();if(cr.ok)setCoupons(cd.coupons||[]);}catch{}},[code]);
+ const loadGame=useCallback(async()=>{try{const token=sessionStorage.getItem(`party-player-${code}`);const res=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"player_get_current_game",code})});const d=await res.json();if(res.ok){setGameSession(d.session);if(d.session?.status!=="active")setGameEntered(false);}const cr=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json","x-player-token":token||""},body:JSON.stringify({action:"player_get_game_coupons",code})});const cd=await cr.json();if(cr.ok)setCoupons(cd.coupons||[]);}catch{}},[code]);
  const loadRound=useCallback(async()=>{
-  const {data:r}=await supabase.from("rooms").select("id").eq("code",code).single();if(!r)return;
-  const {data}=await supabase.from("game_rounds").select("id,round_number,question,status,started_at,ends_at").eq("room_id",r.id).eq("game_key","subjective_quiz").order("created_at",{ascending:false}).limit(1).maybeSingle();
-  if(data){setRound(data as Round);if(data.status!=="answering")setSubmitted(true);}
+  try{
+   const res=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"player_get_current_quiz_round",code})});
+   const data=await res.json();
+   if(res.ok&&data.round){
+    setRound(data.round as Round);
+    if(data.round.status!=="answering")setSubmitted(true);
+   }else if(res.ok&&!data.round){setRound(null);}
+  }catch(error){console.error("퀴즈 라운드 조회 실패",error);}
  },[code]);
  useEffect(()=>{
-  load();loadRound();loadGame();const poll=setInterval(()=>loadGame(),2500);
+  load();loadRound();loadGame();const poll=setInterval(()=>{loadGame();loadRound();},2500);
   const c=supabase.channel(`party-${code}`).on("postgres_changes",{event:"*",schema:"public",table:"players"},load).on("postgres_changes",{event:"*",schema:"public",table:"rooms"},load).on("postgres_changes",{event:"*",schema:"public",table:"game_rounds"},()=>{setSubmitted(false);setAnswer("");loadRound();}).subscribe();
   return()=>{clearInterval(poll);supabase.removeChannel(c)};
  },[code,load,loadRound,loadGame]);
@@ -84,10 +96,10 @@ export default function PlayerRoom(){
   <div className="row"><div className="brand">🎉 PARTY POINT</div><span className="pill">{room?.status==="playing"?"게임 진행 중":room?.status==="finished"?"종료":"대기 중"}</span></div>
   <div className="hero"><div className="eyebrow">PLAYER ROOM · {code}</div><h1>{room?.name||"파티 입장 중"}</h1><p>내 포인트와 비밀 미션을 확인하고 실시간 게임에 참여해봐.</p></div>
   {error&&<div className="error">{error}</div>}
-  {round&&gameSession?.game_key==="subjective_quiz"&&<section className="card stack" style={{marginBottom:14}}>
-   <div className="row"><h2>주관식 퀴즈 {round.round_number}/7</h2><span className="pill">{round.status==="answering"?"답변 접수 중":"답변 마감"}</span></div>
-   <h2>{round.question}</h2>
-   {submitted?<div className="success">답변을 제출했어! 진행자의 채점을 기다려줘.</div>:round.status==="answering"?<><div className="field"><label>내 답변</label><input value={answer} onChange={e=>setAnswer(e.target.value)} maxLength={300} placeholder="정답을 입력해줘."/></div><button className="btn full" disabled={busy||!answer.trim()} onClick={submitAnswer}>답변 제출</button></>:<div className="notice">진행자가 답변을 마감했어. 다음 문제를 기다려줘.</div>}
+  {visibleQuizRound&&<section className="card stack" style={{marginBottom:14}}>
+   <div className="row"><h2>주관식 퀴즈 {visibleQuizRound.round_number}/7</h2><span className="pill">{visibleQuizRound.status==="answering"?"답변 접수 중":"답변 마감"}</span></div>
+   <h2>{visibleQuizRound.question}</h2>
+   {submitted?<div className="success">답변을 제출했어! 진행자의 채점을 기다려줘.</div>:visibleQuizRound.status==="answering"?<><div className="field"><label>내 답변</label><input value={answer} onChange={e=>setAnswer(e.target.value)} maxLength={300} placeholder="정답을 입력해줘."/></div><button className="btn full" disabled={busy||!answer.trim()} onClick={submitAnswer}>답변 제출</button></>:<div className="notice">진행자가 답변을 마감했어. 다음 문제를 기다려줘.</div>}
   </section>}
 
   {gameSession&&<GameStage session={gameSession} />}

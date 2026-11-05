@@ -744,11 +744,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "player_get_current_game") {
-      const { room } = await authenticate(db, body, req);
+      // 현재 게임 무대 정보는 참가자 화면에 공개되는 데이터이므로
+      // 세션 토큰 누락/갱신 문제로 참가자 화면 갱신이 막히지 않게 방 코드로 조회한다.
+      const code = String(body.code || "").toUpperCase();
+      const { data: room, error: roomError } = await db.from("rooms").select("id,status").eq("code", code).single();
+      if (roomError || !room) throw new Error("방을 찾을 수 없어.");
       const { data, error } = await db.from("party_game_sessions").select("id,game_key,game_title,round_number,status,question,public_data,started_at,ends_at,created_at,settled_at")
         .eq("room_id", room.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (error) throw error;
-      return NextResponse.json({ session: data });
+      return NextResponse.json({ session: data, roomStatus: room.status });
+    }
+
+    if (body.action === "player_get_current_quiz_round") {
+      const code = String(body.code || "").toUpperCase();
+      const { data: room, error: roomError } = await db.from("rooms").select("id").eq("code", code).single();
+      if (roomError || !room) throw new Error("방을 찾을 수 없어.");
+      const { data, error } = await db.from("game_rounds").select("id,round_number,question,status,started_at,ends_at,created_at")
+        .eq("room_id", room.id).eq("game_key", "subjective_quiz")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return NextResponse.json({ round: data });
     }
 
     throw new Error("지원하지 않는 요청이야.");
