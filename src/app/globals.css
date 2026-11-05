@@ -107,3 +107,13 @@ body:before,body:after{content:none!important;display:none!important}
 .game-fullscreen .stage-question{font-size:clamp(20px,3vw,32px);text-align:center;padding:24px}
 .game-fullscreen .stage-caption{font-size:clamp(18px,2vw,26px)}
 @keyframes arenaEnter{0%{opacity:0;transform:translateY(24px) scale(.97);filter:blur(8px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:translateY(0) scale(1)}}
+
+
+/* RPS live tournament bracket */
+.rps-bracket{display:flex;gap:14px;overflow-x:auto;padding:8px 2px 14px;align-items:flex-start}
+.rps-round{min-width:190px;flex:1;display:flex;flex-direction:column;gap:10px}
+.rps-round h3{font-size:14px;color:#d8b4fe;margin:0 0 4px}
+.rps-match{border:1px solid rgba(192,132,252,.35);border-radius:12px;padding:9px;background:rgba(20,10,32,.72);display:grid;gap:6px;font-size:13px}
+.rps-match>div{padding:8px 9px;border-radius:8px;background:rgba(255,255,255,.045)}
+.rps-match .rps-winner{background:rgba(34,197,94,.16);color:#86efac;border:1px solid rgba(74,222,128,.45);font-weight:800}
+@media(max-width:640px){.rps-round{min-width:165px}.rps-bracket{gap:10px}}

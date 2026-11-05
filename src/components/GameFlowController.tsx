@@ -46,6 +46,13 @@ export default function GameFlowController({code,api,onMessage,onError}:{code:st
     router.push(`/host/${code}/play/game?kind=${targetKind}&key=${existing.game_key}&round=${existing.round_number||1}&step=${Math.max(match,0)}`);
     return;
    }
+   if(activeStep.key==="free_choice"){
+    setIndex(currentIndex);
+    localStorage.setItem(storageKey,JSON.stringify({index:currentIndex,started:true,done:false}));
+    setStarted(true);
+    router.push(`/host/${code}/play/game?kind=free&round=1&step=${currentIndex}`);
+    return;
+   }
    if(activeStep.kind==="quiz"){
     setIndex(currentIndex);
     localStorage.setItem(storageKey,JSON.stringify({index:currentIndex,started:true,done:false}));
