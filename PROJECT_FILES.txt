@@ -1,0 +1,12 @@
+PARTY POINT - 통합 프로젝트 파일
+
+- src/app/page.tsx                    메인 / 방 생성 / 참가
+- src/app/host/[code]/page.tsx        진행자 대시보드 / 주관식 퀴즈 / 통합 게임 허브
+- src/app/room/[code]/page.tsx        참가자 대시보드 / 퀴즈 / 게임 참가 / 쿠폰
+- src/app/api/game/route.ts           서버 API / 인증 / 게임 진행 및 포인트 정산
+- src/lib/missions.ts                 비밀 미션 목록
+- src/lib/supabase.ts                 Supabase 브라우저 클라이언트
+- supabase/schema.sql                 기본 방/참가자/포인트 테이블
+- supabase/game_system.sql            주관식 퀴즈 테이블
+- supabase/full_game_system.sql       통합 게임 세션/참가/쿠폰 테이블 추가 SQL
+- README.md                           설치/실행/게임 규칙 안내
