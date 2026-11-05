@@ -35,8 +35,9 @@ export default function HostRoom(){
   try{const d=await api("host_get_active_round");setRound(d.round);if(d.round)await refreshAnswers(d.round.id);}catch{}
  },[api,refreshAnswers]);
  useEffect(()=>{load();refreshRound();refreshGame();const timer=setInterval(()=>{if(round?.status==="answering")refreshAnswers(round.id);refreshGame();},2500);const c=supabase.channel(`host-${code}`).on("postgres_changes",{event:"*",schema:"public",table:"players"},load).on("postgres_changes",{event:"*",schema:"public",table:"rooms"},load).on("postgres_changes",{event:"*",schema:"public",table:"game_rounds"},refreshRound).subscribe();return()=>{clearInterval(timer);supabase.removeChannel(c)};},[code,load,refreshRound,round,refreshAnswers,refreshGame]);
- const sorted=useMemo(()=>[...players].sort((a,b)=>b.points-a.points),[players]);
- const pending=players.filter(p=>p.mission_status==="submitted");
+ const participants=useMemo(()=>players.filter(p=>!p.is_host),[players]);
+ const sorted=useMemo(()=>[...participants].sort((a,b)=>b.points-a.points),[participants]);
+ const pending=participants.filter(p=>p.mission_status==="submitted");
  async function call(action:string,extra:any={}){setBusy(true);setError("");setMessage("");try{await api(action,extra);setMessage("처리 완료");await load();await refreshRound();await refreshGame();}catch(e){setError(e instanceof Error?e.message:"오류가 발생했어.");}finally{setBusy(false);}}
  async function startQuiz(){setBusy(true);setError("");try{const d=await api("host_start_quiz_round",{question,roundNumber});setRound(d.round);setQuestion("");setMessage(`${roundNumber}번 문제 시작! 10초 동안 답변을 받아.`);await refreshAnswers(d.round.id);}catch(e){setError(e instanceof Error?e.message:"오류");}finally{setBusy(false);}}
  async function grade(a:QuizAnswer,correct:boolean){setBusy(true);setError("");try{await api("host_grade_quiz_answer",{answerId:a.id,correct,reward:300});await refreshAnswers(round!.id);await load();}catch(e){setError(e instanceof Error?e.message:"채점 오류");}finally{setBusy(false);}}
