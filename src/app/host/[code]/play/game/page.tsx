@@ -8,7 +8,7 @@ export default function GamePage(){
  const {code:raw}=useParams<{code:string}>(),code=raw.toUpperCase(),router=useRouter(),sp=useSearchParams();
  const kind=sp.get("kind")||"game",key=sp.get("key")||"",roundNo=Number(sp.get("round")||1),step=Number(sp.get("step")||0);
  const [session,setSession]=useState<any>(null),[entries,setEntries]=useState<any[]>([]),[round,setRound]=useState<any>(null),[answers,setAnswers]=useState<any[]>([]);
- const [question,setQuestion]=useState(""),[oxAnswer,setOxAnswer]=useState("O"),[outcome,setOutcome]=useState("odd"),[winnerId,setWinnerId]=useState(""),[runnerId,setRunnerId]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const [question,setQuestion]=useState(""),[oxAnswer,setOxAnswer]=useState("O"),[outcome,setOutcome]=useState("odd"),[winnerId,setWinnerId]=useState(""),[runnerId,setRunnerId]=useState(""),[reward,setReward]=useState("1000"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const hostToken=()=>sessionStorage.getItem(`party-host-${code}`)||"";
  const api=useCallback(async(action:string,extra:any={})=>{const r=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json","x-host-token":hostToken()},body:JSON.stringify({action,code,...extra})});const d=await r.json();if(!r.ok)throw new Error(d.error||"요청 실패");return d},[code]);
  const refresh=useCallback(async()=>{
