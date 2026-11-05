@@ -19,7 +19,7 @@ export default function HostRoom(){
   const {data:r}=await supabase.from("rooms").select("id,code,name,status,created_at").eq("code",code).single();
   if(!r)return;setRoom(r);
   const {data:p}=await supabase.from("players").select("id,room_id,nickname,points,mission_level,mission_id,mission_status,is_host,created_at,mission_title,mission_description,mission_reward").eq("room_id",r.id).order("created_at");
-  setPlayers((p||[]) as P[]);if(!selected&&p?.length)setSelected(p[0].id);
+  setPlayers((p||[]) as P[]);if(p?.length)setSelected((current)=>current||p[0].id);
  },[code]);
  const api=useCallback(async(action:string,extra:any={})=>{
   const res=await fetch("/api/game",{method:"POST",headers:{"Content-Type":"application/json","x-host-token":hostToken()},body:JSON.stringify({action,code,...extra})});

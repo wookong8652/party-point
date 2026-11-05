@@ -327,14 +327,20 @@ export async function POST(req: NextRequest) {
       }
 
       if (body.action === "host_finish") {
-        const { error } = await db
-          .from("rooms")
-          .update({ status: "finished" })
-          .eq("id", room.id);
-
+        const { data: finalPlayers, error: playersError } = await db
+          .from("players")
+          .select("id,nickname,points")
+          .eq("room_id", room.id)
+          .order("points", { ascending: false })
+          .order("created_at", { ascending: true });
+        if (playersError) throw playersError;
+        const { error: closeError } = await db.from("party_game_sessions")
+          .update({ status: "settled", settled_at: new Date().toISOString() })
+          .eq("room_id", room.id).in("status", ["active", "closed"]);
+        if (closeError) throw closeError;
+        const { error } = await db.from("rooms").update({ status: "finished" }).eq("id", room.id);
         if (error) throw error;
-
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, standings: finalPlayers || [], winner: finalPlayers?.[0] || null });
       }
 
       const { data: player, error: findError } = await db
@@ -539,6 +545,7 @@ export async function POST(req: NextRequest) {
     // 통합 게임 시스템: 진행자가 세션을 열고 참가자가 선택/베팅하며 서버가 정산
     if (body.action === "host_create_game") {
       const { room } = await authenticate(db, body, req, true);
+      if (room.status === "finished") throw new Error("이미 종료된 파티야. 새 게임을 시작할 수 없어.");
       const allowed: Record<string, string> = {
         odd_even: "홀짝",
         secret_auction_1: "비밀경매 1라운드 · 정답 +1,000P권",
@@ -569,6 +576,7 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "player_game_entry") {
       const { room, player } = await authenticate(db, body, req);
+      if (room.status === "finished") throw new Error("파티가 종료되어 더 이상 게임에 참여할 수 없어.");
       const { data: session, error: sessionError } = await db.from("party_game_sessions").select("*")
         .eq("id", body.sessionId).eq("room_id", room.id).single();
       if (sessionError || !session || session.status !== "active") throw new Error("현재 참여할 수 있는 게임이 없어.");
@@ -652,16 +660,20 @@ export async function POST(req: NextRequest) {
         if (txError) throw txError;
       };
       const key = session.game_key;
+      let resolvedOddEvenOutcome: "odd" | "even" | null = null;
       if (key === "odd_even") {
-        const outcome = String(body.outcome || "");
-        if (!["odd", "even"].includes(outcome)) throw new Error("홀 또는 짝 결과를 지정해줘.");
-        for (const e of rows) if (e.amount > 0 && e.choice === outcome) await changePoints(e.player_id, e.amount * 2, "홀짝 승리 · 총 2배 반환");
+        // 결과는 방장이 고르지 않고 서버에서 50:50으로 무작위 추첨한다.
+        resolvedOddEvenOutcome = Math.random() < 0.5 ? "odd" : "even";
+        for (const e of rows) if (e.amount > 0 && e.choice === resolvedOddEvenOutcome) await changePoints(e.player_id, e.amount * 2, "홀짝 승리 · 총 2배 반환");
       } else if (key === "devil_double") {
-        const success = typeof body.success === "boolean" ? body.success : Math.random() < 0.4;
-        session.public_data = { ...(session.public_data || {}), success };
+        const playerResults: Record<string, { success: boolean; nickname: string }> = {};
         for (const e of rows) {
+          const success = Math.random() < 0.4;
+          const player = await loadPlayer(e.player_id);
+          playerResults[e.player_id] = { success, nickname: player.nickname };
           if (success) await changePoints(e.player_id, 2500, "악마의 더블업 성공 · 총 지급 2,500P");
         }
+        session.public_data = { ...(session.public_data || {}), player_results: playerResults };
       } else if (key === "ox_pool") {
         const answer = String(session.secret_answer || "").toUpperCase();
         const winners = rows.filter(e => String(e.choice).toUpperCase() === answer);
@@ -670,9 +682,11 @@ export async function POST(req: NextRequest) {
         const loserPool = losers.filter(e => !e.payload?.free_bet).reduce((sum, e) => sum + e.amount, 0);
         if (winners.length === 0) {
           // 전원 오답: 이미 선차감된 실제 베팅금은 그대로 소멸. 무료권 베팅은 손실 없음.
-        } else if (losers.length === 0) {
-          // 전원 정답: 실제 베팅자에게 원금 반환, 무료권은 소모만 됨.
-          for (const e of winners) if (!e.payload?.free_bet) await changePoints(e.player_id, e.amount, "OX 전원 정답 · 베팅 원금 반환");
+        } else if (winners.length === rows.length) {
+          // 전원 정답: 실제 베팅금은 이미 차감되었으므로 각자 원금 전액을 돌려준다.
+          for (const e of winners) {
+            if (!e.payload?.free_bet && e.amount > 0) await changePoints(e.player_id, e.amount, "OX 전원 정답 · 베팅 원금 반환");
+          }
         } else {
           for (const e of winners) {
             const share = totalWinnerStake > 0 ? Math.floor(loserPool * e.amount / totalWinnerStake) : 0;
@@ -701,8 +715,8 @@ export async function POST(req: NextRequest) {
         await changePoints(winnerId, reward, "자유 선택 게임 보상");
       }
       let resultData: any = { ...(session.public_data || {}) };
-      if (key === "odd_even") resultData.outcome = String(body.outcome || "");
-      if (key === "devil_double") resultData.success = session.public_data?.success ?? resultData.success;
+      if (key === "odd_even") resultData.outcome = resolvedOddEvenOutcome;
+      if (key === "devil_double") resultData.player_results = session.public_data?.player_results || {};
       if (key === "ox_pool") resultData.answer = String(session.secret_answer || "").toUpperCase();
       if (key === "rps" || key === "free_choice") {
         const winner = rows.find(e => e.player_id === String(body.winnerId || ""));

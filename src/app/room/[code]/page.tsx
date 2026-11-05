@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {useParams} from "next/navigation";
 import {supabase} from "@/lib/supabase";
 import {LEVEL_LABEL,type MissionLevel} from "@/lib/missions";
@@ -15,9 +15,23 @@ export default function PlayerRoom(){
  const [nicknameInput,setNicknameInput]=useState("");
  const [round,setRound]=useState<Round|null>(null),[answer,setAnswer]=useState(""),[submitted,setSubmitted]=useState(false);
  const [gameSession,setGameSession]=useState<any>(null),[gameChoice,setGameChoice]=useState("odd"),[gameAmount,setGameAmount]=useState("500"),[gameEntered,setGameEntered]=useState(false),[coupons,setCoupons]=useState<any[]>([]),[freeCouponId,setFreeCouponId]=useState("");
+ const previousSessionId=useRef<string|null>(null);
  const nickname=typeof window!=="undefined"?localStorage.getItem(`party-nickname-${code}`):null;
  const me=players.find(p=>p.nickname===nickname);
  const sorted=useMemo(()=>[...players].sort((a,b)=>b.points-a.points),[players]);
+ useEffect(()=>{
+  const nextId=gameSession?.id??null;
+  if(previousSessionId.current!==nextId){
+   previousSessionId.current=nextId;
+   setGameEntered(false);
+   setGameChoice("odd");
+   setGameAmount("500");
+   setFreeCouponId("");
+   setAnswer("");
+   setSubmitted(false);
+   if(gameSession?.game_key!=="subjective_quiz")setRound(null);
+  }
+ },[gameSession?.id,gameSession?.game_key]);
  const load=useCallback(async()=>{
   const {data:r}=await supabase.from("rooms").select("id,code,name,status,created_at").eq("code",code).single();
   if(!r)return;setRoom(r);
@@ -60,18 +74,24 @@ export default function PlayerRoom(){
  const levelName=me?.mission_level?LEVEL_LABEL[me.mission_level]:"";
  async function submitAnswer(){const d=await action("player_submit_quiz_answer",{roundId:round?.id,answer});if(d?.ok)setSubmitted(true);}
  async function enterGame(){const d=await action("player_game_entry",{sessionId:gameSession?.id,choice:gameSession?.game_key==="devil_double"?"enter":gameChoice,amount:Number(gameAmount),freeCouponId});if(d?.ok){setGameEntered(true);await loadGame();}}
+ if(room?.status==="finished") return <main className="page">
+  <div className="hero"><div className="eyebrow">PARTY FINISHED · {code}</div><h1>🎉 파티 종료!</h1><p>오늘 게임은 모두 끝났어. 최종 순위를 확인해봐.</p></div>
+  <section className="card stack"><h2>🏆 최종 우승자</h2>{sorted[0]&&<><h1>{sorted[0].nickname}</h1><div className="points">{sorted[0].points.toLocaleString()}P</div></>}{sorted.map((p,i)=><div className="listitem" key={p.id}><span>{i+1}위 · {p.nickname}</span><b>{p.points.toLocaleString()}P</b></div>)}</section>
+  <div className="notice">진행자가 파티를 종료했어. 이 화면에서 최종 결과를 확인하면 돼.</div>
+ </main>;
  return <main className="page">
   <div className="row"><div className="brand">🎉 PARTY POINT</div><span className="pill">{room?.status==="playing"?"게임 진행 중":room?.status==="finished"?"종료":"대기 중"}</span></div>
   <div className="hero"><div className="eyebrow">PLAYER ROOM · {code}</div><h1>{room?.name||"파티 입장 중"}</h1><p>내 포인트와 비밀 미션을 확인하고 실시간 게임에 참여해봐.</p></div>
   {error&&<div className="error">{error}</div>}
-  {round&&<section className="card stack" style={{marginBottom:14}}>
+  {round&&gameSession?.game_key==="subjective_quiz"&&<section className="card stack" style={{marginBottom:14}}>
    <div className="row"><h2>주관식 퀴즈 {round.round_number}/7</h2><span className="pill">{round.status==="answering"?"답변 접수 중":"답변 마감"}</span></div>
    <h2>{round.question}</h2>
    {submitted?<div className="success">답변을 제출했어! 진행자의 채점을 기다려줘.</div>:round.status==="answering"?<><div className="field"><label>내 답변</label><input value={answer} onChange={e=>setAnswer(e.target.value)} maxLength={300} placeholder="정답을 입력해줘."/></div><button className="btn full" disabled={busy||!answer.trim()} onClick={submitAnswer}>답변 제출</button></>:<div className="notice">진행자가 답변을 마감했어. 다음 문제를 기다려줘.</div>}
   </section>}
 
   {gameSession&&<GameStage session={gameSession} />}
-  {gameSession&&<section className="card stack" style={{marginBottom:14}}><div className="row"><h2>현재 진행 게임</h2><span className="pill">{gameSession.status==="active"?"참가 가능":gameSession.status==="closed"?"마감":"정산 완료"}</span></div><h2>{gameSession.game_title}</h2>{gameSession.question&&<div className="notice">{gameSession.question}</div>}{gameSession.status==="active"&&!gameEntered&&<>{gameSession.game_key==="odd_even"&&<div className="field"><label>홀짝 선택</label><select value={gameChoice} onChange={e=>setGameChoice(e.target.value)}><option value="odd">홀</option><option value="even">짝</option></select></div>}{gameSession.game_key==="ox_pool"&&<div className="field"><label>정답 선택</label><select value={gameChoice} onChange={e=>setGameChoice(e.target.value)}><option value="O">O</option><option value="X">X</option></select></div>}{(gameSession.game_key==="odd_even"||gameSession.game_key==="ox_pool")&&<div className="field"><label>베팅 포인트 (100~1,000P)</label><input type="number" min="100" max="1000" step="100" value={gameAmount} onChange={e=>setGameAmount(e.target.value)}/></div>}{gameSession.game_key==="odd_even"&&coupons.some(c=>c.coupon_type==="free_bet")&&<div className="field"><label>베팅 무료권 사용</label><select value={freeCouponId} onChange={e=>setFreeCouponId(e.target.value)}><option value="">사용하지 않음</option>{coupons.filter(c=>c.coupon_type==="free_bet").map(c=><option key={c.id} value={c.id}>무료권 사용</option>)}</select></div>}{(gameSession.game_key==="secret_auction_1"||gameSession.game_key==="secret_auction_2")&&<div className="field"><label>비밀 입찰 금액</label><input type="number" min="100" value={gameAmount} onChange={e=>setGameAmount(e.target.value)}/></div>}<button className="btn full" disabled={busy} onClick={enterGame}>{gameSession.game_key==="devil_double"?"1,000P로 더블업 도전":gameSession.game_key.startsWith("secret_auction")?"비밀 입찰 제출":gameSession.game_key==="rps"?"토너먼트 참가":"선택 및 베팅 제출"}</button></>}{gameEntered&&<div className="success">참가 신청 완료! 진행자의 마감 및 결과 발표를 기다려줘.</div>}{coupons.length>0&&<div className="notice"><b>보유 쿠폰</b>{coupons.map(c=><div key={c.id}>{c.coupon_type==="answer_1000"?"정답 시 +1,000P권":"한 라운드 베팅 무료권"}</div>)}</div>}</section>}
+  {gameSession?.game_key==="devil_double"&&gameSession.status==="settled"&&me&&gameSession.public_data?.player_results?.[me.id]&&<section className="card stack"><h2>내 더블업 결과</h2><h1>{gameSession.public_data.player_results[me.id].success?"🎉 성공!":"💀 실패..."}</h1><p>{gameSession.public_data.player_results[me.id].success?"2,500P를 획득했어!":"이번 도전은 실패했어."}</p></section>}
+  {gameSession&&<section className="card stack" style={{marginBottom:14}}><div className="row"><h2>현재 진행 게임</h2><span className="pill">{gameSession.status==="active"?"참가 가능":gameSession.status==="closed"?"마감":"정산 완료"}</span></div><h2>{gameSession.game_title}</h2>{gameSession.question&&<div className="notice">{gameSession.question}</div>}{gameSession.status==="active"&&!gameEntered&&<>{gameSession.game_key==="odd_even"&&<div className="field"><label>홀짝 선택</label><select value={gameChoice} onChange={e=>setGameChoice(e.target.value)}><option value="odd">홀</option><option value="even">짝</option></select></div>}{gameSession.game_key==="ox_pool"&&<div className="field"><label>정답 선택</label><select value={gameChoice} onChange={e=>setGameChoice(e.target.value)}><option value="O">O</option><option value="X">X</option></select></div>}{(gameSession.game_key==="odd_even"||gameSession.game_key==="ox_pool")&&<div className="field"><label>베팅 포인트 (100~1,000P)</label><input type="number" min="100" max="1000" step="100" value={gameAmount} onChange={e=>setGameAmount(e.target.value)}/></div>}{gameSession.game_key==="odd_even"&&coupons.some(c=>c.coupon_type==="free_bet")&&<div className="field"><label>베팅 무료권 사용</label><select value={freeCouponId} onChange={e=>setFreeCouponId(e.target.value)}><option value="">사용하지 않음</option>{coupons.filter(c=>c.coupon_type==="free_bet").map(c=><option key={c.id} value={c.id}>무료권 사용</option>)}</select></div>}{(gameSession.game_key==="secret_auction_1"||gameSession.game_key==="secret_auction_2")&&<div className="field"><label>비밀 입찰 금액</label><input type="number" min="100" value={gameAmount} onChange={e=>setGameAmount(e.target.value)}/></div>}<button className="btn full" disabled={busy} onClick={enterGame}>{gameSession.game_key==="devil_double"?"1,000P로 더블업 도전":gameSession.game_key.startsWith("secret_auction")?"비밀 입찰 제출":gameSession.game_key==="rps"?"토너먼트 참가":"선택 및 베팅 제출"}</button></>}{gameEntered&&<div className="success">{gameSession.game_key==="odd_even"?<>참가 신청 완료!<br/><b>내 선택: {gameChoice==="odd"?"홀":"짝"}</b><br/>베팅 금액: {Number(gameAmount).toLocaleString()}P<br/>사다리 결과 발표를 기다려줘.</>:"참가 신청 완료! 진행자의 마감 및 결과 발표를 기다려줘."}</div>}{coupons.length>0&&<div className="notice"><b>보유 쿠폰</b>{coupons.map(c=><div key={c.id}>{c.coupon_type==="answer_1000"?"정답 시 +1,000P권":"한 라운드 베팅 무료권"}</div>)}</div>}</section>}
 
   {!me?<section className="card stack" style={{marginBottom:14}}>
    <div><div className="eyebrow">JOIN PARTY · {code}</div><h2>파티에 참가하기</h2><p className="muted">친구들이 알아볼 수 있는 닉네임을 입력해줘. 입장하면 5,000P가 자동 지급돼.</p></div>
