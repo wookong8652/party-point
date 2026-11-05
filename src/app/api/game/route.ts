@@ -225,54 +225,32 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "assign_mission") {
       const { room, player } = await authenticate(db, body, req);
-
-      if (player.mission_id) {
-        throw new Error("이미 미션을 배정받았어.");
-      }
-
       const level = body.level as MissionLevel;
-
       if (!["easy", "normal", "hard"].includes(level)) {
         throw new Error("난이도를 선택해줘.");
       }
 
-      const { data: usedRows, error: usedError } = await db
-        .from("players")
-        .select("mission_id")
-        .eq("room_id", room.id)
-        .not("mission_id", "is", null);
-
-      if (usedError) throw usedError;
-
-      const usedTitles = new Set(
-        (usedRows || []).map((row: any) => row.mission_id)
+      // 방 단위 DB 잠금 안에서 선택과 저장을 함께 처리해 동시 배정 중복을 막는다.
+      const { data: selected, error: assignError } = await db.rpc(
+        "assign_unique_party_mission",
+        {
+          p_room_id: room.id,
+          p_player_id: player.id,
+          p_level: level,
+          p_missions: MISSIONS,
+        }
       );
 
-      const available = MISSIONS.filter(
-        (mission) =>
-          mission.level === level && !usedTitles.has(mission.title)
-      );
-
-      if (available.length === 0) {
-        throw new Error("이 난이도의 미션이 모두 배정됐어.");
+      if (assignError) {
+        console.error("assign_unique_party_mission failed:", assignError);
+        throw new Error(
+          assignError.message?.includes("모두 배정")
+            ? "이 난이도의 미션이 모두 배정됐어. 다른 난이도를 선택해줘."
+            : assignError.message?.includes("이미 미션")
+              ? "이미 미션을 배정받았어."
+              : "미션 배정 중 오류가 발생했어. 잠시 후 다시 시도해줘."
+        );
       }
-
-      const selected =
-        available[Math.floor(Math.random() * available.length)];
-
-      const { error } = await db
-        .from("players")
-        .update({
-          mission_level: level,
-          mission_id: selected.title,
-          mission_title: selected.title,
-          mission_description: selected.description,
-          mission_reward: selected.reward,
-          mission_status: "active",
-        })
-        .eq("id", player.id);
-
-      if (error) throw error;
 
       return NextResponse.json({ mission: selected });
     }
@@ -337,6 +315,7 @@ export async function POST(req: NextRequest) {
           .from("players")
           .select("id,nickname,points")
           .eq("room_id", room.id)
+          .eq("is_host", false)
           .order("points", { ascending: false })
           .order("created_at", { ascending: true });
         if (playersError) throw playersError;
@@ -494,40 +473,19 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "host_grade_quiz_answer") {
       const { room } = await authenticate(db, body, req, true);
-      const correct = Boolean(body.correct);
       const reward = Number(body.reward ?? 300);
       if (!Number.isInteger(reward) || reward < 0 || reward > 2000) {
         throw new Error("보상은 0~2,000P 사이로 입력해줘.");
       }
-      const { data: answer, error: answerError } = await db.from("quiz_answers")
-        .select("*").eq("id", body.answerId).eq("room_id", room.id).single();
-      if (answerError || !answer) throw new Error("답변을 찾을 수 없어.");
-      if (answer.judged) throw new Error("이미 채점한 답변이야.");
-      const { data: player, error: playerError } = await db.from("players")
-        .select("*").eq("id", answer.player_id).eq("room_id", room.id).single();
-      if (playerError || !player) throw new Error("참가자를 찾을 수 없어.");
-      let amount = correct ? reward : 0;
-      if (correct) {
-        const { data: coupon } = await db.from("party_game_coupons").select("id").eq("room_id", room.id).eq("player_id", player.id).eq("coupon_type", "answer_1000").is("used_at", null).order("created_at").limit(1).maybeSingle();
-        if (coupon) {
-          amount += 1000;
-          const { error: couponError } = await db.from("party_game_coupons").update({ used_at: new Date().toISOString() }).eq("id", coupon.id);
-          if (couponError) throw couponError;
-        }
-      }
-      if (amount > 0) {
-        const { error } = await db.from("players").update({ points: player.points + amount }).eq("id", player.id);
-        if (error) throw error;
-        const { error: txError } = await db.from("point_transactions").insert({
-          room_id: room.id, player_id: player.id, amount,
-          reason: amount > reward ? "주관식 퀴즈 정답 보상 + 경매 쿠폰" : "주관식 퀴즈 정답 보상"
-        });
-        if (txError) throw txError;
-      }
-      const { error } = await db.from("quiz_answers")
-        .update({ judged: true, correct }).eq("id", answer.id);
-      if (error) throw error;
-      return NextResponse.json({ ok: true, awarded: amount });
+      const { data, error } = await db.rpc("award_quiz_answer_points", {
+        p_room_id: room.id,
+        p_answer_id: String(body.answerId || ""),
+        p_correct: Boolean(body.correct),
+        p_reward: reward,
+      });
+      if (error) throw new Error(`퀴즈 포인트 지급 실패: ${error.message}`);
+      if (!data?.ok) throw new Error(data?.error || "퀴즈 채점에 실패했어.");
+      return NextResponse.json({ ok: true, awarded: Number(data.awarded || 0), pointsBefore: data.points_before, pointsAfter: data.points_after });
     }
 
     if (body.action === "host_close_quiz_round") {
@@ -800,6 +758,7 @@ export async function POST(req: NextRequest) {
       if (key === "rps") {
         resultData.bracket = session.public_data?.bracket || {};
         resultData.winner_nickname = (await loadPlayer(resultData.bracket.champion_id)).nickname;
+        resultData.runner_up_nickname = (await loadPlayer(resultData.bracket.runner_up_id)).nickname;
       }
       if (key === "free_choice") {
         const winner = rows.find(e => e.player_id === String(body.winnerId || ""));
@@ -833,12 +792,37 @@ export async function POST(req: NextRequest) {
       const {data:session,error:sessionError}=await db.from("party_game_sessions").select("id,status,game_key")
         .eq("id",body.sessionId).eq("room_id",room.id).eq("game_key","ox_pool").single();
       if(sessionError||!session)throw new Error("OX 게임을 찾을 수 없어.");
-      const {data:entries,error:entriesError}=await db.from("party_game_entries").select("choice,amount").eq("session_id",session.id);
+      const {data:entries,error:entriesError}=await db.from("party_game_entries")
+        .select("choice,amount,player_id,players(nickname)").eq("session_id",session.id).order("created_at",{ascending:true});
       if(entriesError)throw entriesError;
-      const oPool=(entries||[]).filter((e:any)=>String(e.choice).toUpperCase()==="O").reduce((n:number,e:any)=>n+Number(e.amount||0),0);
-      const xPool=(entries||[]).filter((e:any)=>String(e.choice).toUpperCase()==="X").reduce((n:number,e:any)=>n+Number(e.amount||0),0);
+      const rows=(entries||[]).map((e:any)=>({
+        playerId:e.player_id,
+        nickname:Array.isArray(e.players)?e.players[0]?.nickname:e.players?.nickname||"참가자",
+        choice:String(e.choice||"").toUpperCase(),
+        amount:Number(e.amount||0),
+      }));
+      const oPool=rows.filter((e:any)=>e.choice==="O").reduce((n:number,e:any)=>n+e.amount,0);
+      const xPool=rows.filter((e:any)=>e.choice==="X").reduce((n:number,e:any)=>n+e.amount,0);
       const total=oPool+xPool;
-      return NextResponse.json({pool:{oPool,xPool,total,oShare:total?Math.round(oPool/total*100):0,xShare:total?Math.round(xPool/total*100):0,oProfitPercent:oPool?Math.round(xPool/oPool*100):null,xProfitPercent:xPool?Math.round(oPool/xPool*100):null,oMultiplier:oPool?Number((total/oPool).toFixed(2)):null,xMultiplier:xPool?Number((total/xPool).toFixed(2)):null}});
+      const bets=rows.map((e:any)=>({...e,poolSharePercent:total?Number((e.amount/total*100).toFixed(1)):0}));
+      return NextResponse.json({pool:{oPool,xPool,total,oShare:total?Number((oPool/total*100).toFixed(1)):0,xShare:total?Number((xPool/total*100).toFixed(1)):0,oProfitPercent:oPool?Number((xPool/oPool*100).toFixed(1)):null,xProfitPercent:xPool?Number((oPool/xPool*100).toFixed(1)):null,oMultiplier:oPool?Number((total/oPool).toFixed(2)):null,xMultiplier:xPool?Number((total/xPool).toFixed(2)):null,bets}});
+    }
+
+    if (body.action === "player_get_point_history") {
+      const { room, player } = await authenticate(db, body, req);
+      const { data:transactions, error } = await db.from("point_transactions")
+        .select("id,amount,reason,created_at")
+        .eq("room_id",room.id).eq("player_id",player.id)
+        .order("created_at",{ascending:false}).limit(30);
+      if(error)throw error;
+      let running=Number(player.points||0);
+      const history=(transactions||[]).map((tx:any)=>{
+        const after=running;
+        const before=after-Number(tx.amount||0);
+        running=before;
+        return {...tx,pointsBefore:before,pointsAfter:after};
+      });
+      return NextResponse.json({history,currentPoints:Number(player.points||0)});
     }
 
     if (body.action === "player_get_current_game") {

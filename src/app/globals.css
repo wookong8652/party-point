@@ -117,3 +117,8 @@ body:before,body:after{content:none!important;display:none!important}
 .rps-match>div{padding:8px 9px;border-radius:8px;background:rgba(255,255,255,.045)}
 .rps-match .rps-winner{background:rgba(34,197,94,.16);color:#86efac;border:1px solid rgba(74,222,128,.45);font-weight:800}
 @media(max-width:640px){.rps-round{min-width:165px}.rps-bracket{gap:10px}}
+
+
+/* OX public pool details and game rules */
+.stage-rules{margin:12px 0;padding:12px 14px;border-color:rgba(192,132,252,.35)}
+.stage-rules p{margin:6px 0 0;line-height:1.65;color:#ddd0f2}
