@@ -1,27 +1,28 @@
 export const MISSIONS = [
-  {level:"easy",title:"자연스러운 건배",description:"다른 사람과 건배를 총 3번 하세요.",reward:300},
-  {level:"easy",title:"몰래 박수",description:"대화 중 자연스럽게 박수를 3번 치세요.",reward:300},
+  // 쉬움 · 300P
   {level:"easy",title:"하이파이브",description:"서로 다른 사람 2명과 하이파이브 하세요.",reward:300},
-  {level:"easy",title:"물건 빌리기",description:"다른 사람에게 물건을 2번 빌리세요.",reward:300},
-  {level:"easy",title:"가위바위보",description:"다른 사람 3명과 가위바위보를 하세요.",reward:300},
-  {level:"easy",title:"자리 이동",description:"파티 중 자리를 2번 바꾸세요.",reward:300},
+  {level:"easy",title:"물건 빌리기",description:"다른 사람에게 물건을 1번 빌리세요.",reward:300},
   {level:"easy",title:"칭찬하기",description:"서로 다른 사람 2명에게 칭찬을 해주세요.",reward:300},
-  {level:"normal",title:"웃음 전염",description:"다른 사람 3명을 각각 웃게 만드세요.",reward:500},
-  {level:"normal",title:"따라 하기",description:"다른 사람이 내가 한 행동을 2번 따라 하게 만드세요.",reward:500},
-  {level:"normal",title:"건배 주도",description:"다른 사람 3명이 함께 건배하도록 만드세요.",reward:500},
-  {level:"normal",title:"자연스러운 질문",description:"서로 다른 사람 2명에게 먼저 질문을 받으세요.",reward:500},
-  {level:"normal",title:"질문 유도",description:"다른 사람이 먼저 나에게 질문을 총 3번 하게 만드세요.",reward:500},
-  {level:"normal",title:"단어 전파",description:"내가 사용한 단어를 다른 사람 2명이 따라 사용하게 만드세요.",reward:500},
-  {level:"normal",title:"단체 사진",description:"다른 사람 4명 이상과 단체 사진을 찍으세요.",reward:500},
-  {level:"normal",title:"대화 주도권",description:"다른 사람이 먼저 내 의견을 물어보게 만드세요.",reward:500},
-  {level:"hard",title:"몰래 따라 하기",description:"다른 사람 3명이 내가 한 행동을 각각 따라 하게 만드세요.",reward:1000},
-  {level:"hard",title:"연쇄 하이파이브",description:"서로 다른 사람 4명과 연속으로 하이파이브 하세요.",reward:1000},
-  {level:"hard",title:"자발적 건배",description:"내가 먼저 제안하지 않고 다른 사람 3명이 건배를 제안하게 만드세요.",reward:1000},
-  {level:"hard",title:"웃음 참기",description:"다른 사람 3명을 웃게 만들고 본인은 웃지 마세요.",reward:1000},
-  {level:"hard",title:"단체 행동 유도",description:"다른 사람 5명이 동시에 같은 행동을 하게 만드세요.",reward:1000},
-  {level:"hard",title:"자연스러운 노래 신청",description:"다른 사람 2명에게 각각 노래 신청을 받으세요.",reward:1000},
-  {level:"hard",title:"대화 연결",description:"서로 다른 사람 4명이 내 말에 연속으로 반응하게 만드세요.",reward:1000},
-  {level:"hard",title:"몰래 주도하기",description:"다른 사람 3명이 내가 제안한 행동을 자발적으로 실행하게 만드세요.",reward:1000}
+  {level:"easy",title:"화장실 다녀오기",description:"파티 중 화장실에 한 번 다녀오세요.",reward:300},
+  {level:"easy",title:"술 따르다 흘리기",description:"친구에게 술을 따라주다가 잔에 들어가기 전 술을 잔 용량의 3분의 1 이상 흘리세요. 일부러 바닥에 붓거나 다른 사람에게 피해를 주지 마세요.",reward:300},
+
+  // 보통 · 500P
+  {level:"normal",title:"술잔 엎기",description:"소주가 들어 있는 잔 하나를 실수로 엎으세요. 다른 사람이나 전자기기 쪽으로 쏟지 말고 안전하게 정리하세요.",reward:500},
+  {level:"normal",title:"화이트보드 흔적 남기기",description:"화이트보드에 글씨나 그림 등 나만의 흔적을 남기세요.",reward:500},
+  {level:"normal",title:"노래 흥얼거리기",description:"콧노래가 아닌 목소리로 노래를 5초 이상 흥얼거리세요.",reward:500},
+  {level:"normal",title:"한 사람씩 술 따라주기",description:"원하는 사람에게 의사를 물어보고, 자리에 있는 모든 사람에게 술 또는 원하는 음료를 한 잔씩 따라주세요. 마실지는 각자 선택하도록 해주세요.",reward:500},
+  {level:"normal",title:"빗으로 머리 빗기",description:"빗으로 본인의 머리를 빗으세요.",reward:500},
+  {level:"normal",title:"고마워 듣기",description:"서로 다른 사람 2명에게 '고마워' 또는 '땡큐'라는 말을 들으세요.",reward:500},
+
+  // 어려움 · 1,000P
+  {level:"hard",title:"일어나서 박수 3회",description:"자리에서 한 번 일어난 뒤 박수를 3회 이상 치세요. 세 번 일어나는 것이 아닙니다.",reward:1000},
+  {level:"hard",title:"사진 3장 찍기",description:"화면 캡처가 아닌 실제 사진을 3장 이상 촬영하세요.",reward:1000},
+  {level:"hard",title:"플레이리스트 바꾸기",description:"재생 중인 음악의 플레이리스트를 다른 플레이리스트로 바꾸세요.",reward:1000},
+  {level:"hard",title:"자리의 사람에게 전화하기",description:"생일자를 제외하고 그 자리에 있는 사람 한 명에게 전화하세요. 통화 연결음이 한 번 이상 들리면 성공이며, 상대방이 원치 않으면 다른 사람을 선택하세요.",reward:1000},
+  {level:"hard",title:"아우터 앞뒤 바꿔 입기",description:"파티에 입고 온 아우터를 앞으로 입었다가 다시 벗으세요.",reward:1000},
+  {level:"hard",title:"팔벌려뛰기 3회",description:"주변 공간을 확인하고 안전하게 팔벌려뛰기 3회를 성공하세요.",reward:1000},
+  {level:"hard",title:"똥마렵다고 말하기",description:"파티 중 '똥 마렵다'라고 3번 말하세요.",reward:1000}
 ] as const;
+
 export type MissionLevel = "easy" | "normal" | "hard";
 export const LEVEL_LABEL:Record<MissionLevel,string>={easy:"쉬움",normal:"보통",hard:"어려움"};
