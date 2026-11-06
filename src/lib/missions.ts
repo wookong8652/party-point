@@ -10,7 +10,7 @@ export const MISSIONS = [
   {level:"normal",title:"술잔 엎기",description:"소주가 들어 있는 잔 하나를 실수로 엎으세요. 다른 사람이나 전자기기 쪽으로 쏟지 말고 안전하게 정리하세요.",reward:500},
   {level:"normal",title:"화이트보드 흔적 남기기",description:"화이트보드에 글씨나 그림 등 나만의 흔적을 남기세요.",reward:500},
   {level:"normal",title:"노래 흥얼거리기",description:"콧노래가 아닌 목소리로 노래를 5초 이상 흥얼거리세요.",reward:500},
-  {level:"normal",title:"한 사람씩 술 따라주기",description:"원하는 사람에게 의사를 물어보고, 자리에 있는 모든 사람에게 술 또는 원하는 음료를 한 잔씩 따라주세요. 마실지는 각자 선택하도록 해주세요.",reward:500},
+  {level:"normal",title:"한 사람씩 술 따라주기",description:"모든 사람에게 술을 한잔씩 따라주세요.",reward:500},
   {level:"normal",title:"빗으로 머리 빗기",description:"빗으로 본인의 머리를 빗으세요.",reward:500},
   {level:"normal",title:"고마워 듣기",description:"서로 다른 사람 2명에게 '고마워' 또는 '땡큐'라는 말을 들으세요.",reward:500},
 
@@ -18,9 +18,9 @@ export const MISSIONS = [
   {level:"hard",title:"일어나서 박수 3회",description:"자리에서 한 번 일어난 뒤 박수를 3회 이상 치세요. 세 번 일어나는 것이 아닙니다.",reward:1000},
   {level:"hard",title:"사진 3장 찍기",description:"화면 캡처가 아닌 실제 사진을 3장 이상 촬영하세요.",reward:1000},
   {level:"hard",title:"플레이리스트 바꾸기",description:"재생 중인 음악의 플레이리스트를 다른 플레이리스트로 바꾸세요.",reward:1000},
-  {level:"hard",title:"자리의 사람에게 전화하기",description:"생일자를 제외하고 그 자리에 있는 사람 한 명에게 전화하세요. 통화 연결음이 한 번 이상 들리면 성공이며, 상대방이 원치 않으면 다른 사람을 선택하세요.",reward:1000},
+  {level:"hard",title:"자리의 사람에게 전화하기",description:"생일자를 제외하고 그 자리에 있는 사람 한 명에게 전화하세요. 통화 연결음이 한 번 이상 들리면 성공입니다.",reward:1000},
   {level:"hard",title:"아우터 앞뒤 바꿔 입기",description:"파티에 입고 온 아우터를 앞으로 입었다가 다시 벗으세요.",reward:1000},
-  {level:"hard",title:"팔벌려뛰기 3회",description:"주변 공간을 확인하고 안전하게 팔벌려뛰기 3회를 성공하세요.",reward:1000},
+  {level:"hard",title:"팔벌려뛰기 3회",description:"일어나서 팔벌려뛰기 3회를 성공하세요.",reward:1000},
   {level:"hard",title:"똥마렵다고 말하기",description:"파티 중 '똥 마렵다'라고 3번 말하세요.",reward:1000}
 ] as const;
 
