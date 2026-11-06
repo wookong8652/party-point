@@ -544,7 +544,11 @@ export async function POST(req: NextRequest) {
       const { data: session, error: sessionError } = await db.from("party_game_sessions").select("*")
         .eq("id", body.sessionId).eq("room_id", room.id).single();
       if (sessionError || !session || session.status !== "active") throw new Error("현재 참여할 수 있는 게임이 없어.");
-      const choice = String(body.choice || "").trim().slice(0, 30);
+      let choice = String(body.choice || "").trim().slice(0, 30);
+      if (session.game_key === "ox_pool") {
+        choice = choice.toUpperCase();
+        if (choice !== "O" && choice !== "X") throw new Error("OX 선택은 O 또는 X만 가능해. O/X 중 하나를 다시 선택해줘.");
+      }
       let amount = Number(body.amount || 0);
       if (!Number.isInteger(amount) || amount < 0) throw new Error("베팅 금액을 확인해줘.");
       if (["odd_even", "ox_pool"].includes(session.game_key) && (amount < 100 || amount > 1000)) throw new Error("베팅은 100~1,000P로 해줘.");
@@ -710,9 +714,13 @@ export async function POST(req: NextRequest) {
         }
         session.public_data = { ...(session.public_data || {}), player_results: playerResults };
       } else if (key === "ox_pool") {
-        const answer = String(session.secret_answer || "").toUpperCase();
-        const winners = rows.filter(e => String(e.choice).toUpperCase() === answer);
-        const losers = rows.filter(e => String(e.choice).toUpperCase() !== answer);
+        const answer = String(session.secret_answer || "").trim().toUpperCase();
+        if (answer !== "O" && answer !== "X") throw new Error("저장된 OX 정답이 올바르지 않아. 게임을 다시 출제해줘.");
+        // O/X는 반드시 대문자 한 글자로 비교한다. 홀짝 값(odd/even 등)이
+        // 잘못 저장된 오래된 참가 기록은 정답 풀에 섞이지 않도록 제외한다.
+        const validRows = rows.filter(e => ["O", "X"].includes(String(e.choice || "").trim().toUpperCase()));
+        const winners = validRows.filter(e => String(e.choice).trim().toUpperCase() === answer);
+        const losers = validRows.filter(e => String(e.choice).trim().toUpperCase() !== answer);
         const totalWinnerStake = winners.reduce((sum, e) => sum + e.amount, 0);
         const loserPool = losers.filter(e => !e.payload?.free_bet).reduce((sum, e) => sum + e.amount, 0);
         if (winners.length === 0) {
@@ -798,13 +806,16 @@ export async function POST(req: NextRequest) {
       const rows=(entries||[]).map((e:any)=>({
         playerId:e.player_id,
         nickname:Array.isArray(e.players)?e.players[0]?.nickname:e.players?.nickname||"참가자",
-        choice:String(e.choice||"").toUpperCase(),
+        choice:String(e.choice||"").trim().toUpperCase(),
         amount:Number(e.amount||0),
       }));
       const oPool=rows.filter((e:any)=>e.choice==="O").reduce((n:number,e:any)=>n+e.amount,0);
       const xPool=rows.filter((e:any)=>e.choice==="X").reduce((n:number,e:any)=>n+e.amount,0);
       const total=oPool+xPool;
-      const bets=rows.map((e:any)=>({...e,poolSharePercent:total?Number((e.amount/total*100).toFixed(1)):0}));
+      const bets=rows.map((e:any)=>{
+        const sidePool=e.choice==="O"?oPool:e.choice==="X"?xPool:0;
+        return {...e,sideSharePercent:sidePool?Number((e.amount/sidePool*100).toFixed(1)):0,poolSharePercent:total?Number((e.amount/total*100).toFixed(1)):0};
+      });
       return NextResponse.json({pool:{oPool,xPool,total,oShare:total?Number((oPool/total*100).toFixed(1)):0,xShare:total?Number((xPool/total*100).toFixed(1)):0,oProfitPercent:oPool?Number((xPool/oPool*100).toFixed(1)):null,xProfitPercent:xPool?Number((oPool/xPool*100).toFixed(1)):null,oMultiplier:oPool?Number((total/oPool).toFixed(2)):null,xMultiplier:xPool?Number((total/xPool).toFixed(2)):null,bets}});
     }
 
